@@ -1,0 +1,75 @@
+import type { InventoryItem, PartCategory, Supplier } from '../types/domain'
+
+export const mockCategories: PartCategory[] = [
+  { id: 1, name: 'Lower Receiver', slug: 'lower-receiver', sort_order: 1, required: true, description: 'Serialized receiver foundation for the build.' },
+  { id: 2, name: 'Upper Receiver', slug: 'upper-receiver', sort_order: 2, required: true, description: 'Complete or stripped upper receiver group.' },
+  { id: 3, name: 'Barrel', slug: 'barrel', sort_order: 3, required: true, description: 'Caliber, length, gas system, and profile selection.' },
+  { id: 4, name: 'Handguard', slug: 'handguard', sort_order: 4, required: true, description: 'M-LOK, quad rail, and free-float options.' },
+  { id: 5, name: 'Bolt Carrier Group', slug: 'bolt-carrier-group', sort_order: 5, required: true, description: 'BCG options matched to cartridge and finish.' },
+  { id: 6, name: 'Charging Handle', slug: 'charging-handle', sort_order: 6, required: true, description: 'Standard and ambidextrous handles.' },
+  { id: 7, name: 'Stock / Brace', slug: 'stock-brace', sort_order: 7, required: false, description: 'Rifle stocks and pistol braces.' },
+  { id: 8, name: 'Trigger', slug: 'trigger', sort_order: 8, required: false, description: 'Mil-spec, enhanced, and match trigger options.' },
+  { id: 9, name: 'Muzzle Device', slug: 'muzzle-device', sort_order: 9, required: false, description: 'Flash hiders, comps, and brakes.' },
+  { id: 10, name: 'Optics / Sights', slug: 'optics-sights', sort_order: 10, required: false, description: 'Iron sights, red dots, and LPVO-ready mounts.' },
+]
+
+export const mockSuppliers: Supplier[] = [
+  { id: 1, name: 'Aero Precision', contact_name: 'Dealer Desk', email: 'orders@aeroprecision.example', lead_time_days: 7, active: true },
+  { id: 2, name: 'Ballistic Advantage', contact_name: 'Wholesale', email: 'wholesale@ba.example', lead_time_days: 10, active: true },
+  { id: 3, name: 'Magpul Industries', contact_name: 'Distribution', email: 'dist@magpul.example', lead_time_days: 5, active: true },
+  { id: 4, name: 'JJJ Cerakote Bench', contact_name: 'Shop Floor', email: 'shop@jjjgunworks.example', lead_time_days: 3, active: true },
+]
+
+const item = (
+  id: number,
+  category_id: number,
+  sku: string,
+  name: string,
+  price: number,
+  quantity_on_hand: number,
+  quantity_reserved: number,
+  supplier_id: number,
+  description: string,
+  extra: Partial<InventoryItem> = {},
+): InventoryItem => ({
+  id,
+  category_id,
+  sku,
+  name,
+  price,
+  quantity_on_hand,
+  quantity_reserved,
+  supplier_id,
+  unit_cost: Number((price * 0.67).toFixed(2)),
+  reorder_point: 3,
+  description,
+  platform: 'AR-15',
+  compatible_tags: ['ar15', '5.56', 'multi-cal'],
+  ...extra,
+})
+
+export const mockInventory: InventoryItem[] = [
+  item(101, 1, 'JJJ-LR-FDE-001', 'JJJ Forged Lower Receiver - FDE', 129.99, 8, 1, 4, '7075-T6 forged lower with Type III hardcoat and FDE Cerakote.', { finish: 'FDE' }),
+  item(102, 1, 'JJJ-LR-BLK-002', 'JJJ Forged Lower Receiver - Black', 119.99, 2, 1, 4, 'In-house inspected lower receiver with clean engraving flats.', { finish: 'Black' }),
+  item(103, 1, 'AERO-M4E1-LOWER', 'Aero M4E1 Enhanced Lower', 159.99, 0, 0, 1, 'Enhanced forged lower with integrated trigger guard.', { finish: 'Anodized Black' }),
+  item(201, 2, 'AERO-UPR-556', 'Aero Assembled Upper Receiver', 109.99, 11, 2, 1, 'Assembled upper with forward assist and ejection port cover.', { finish: 'Anodized Black' }),
+  item(202, 2, 'JJJ-UPR-TUNG', 'JJJ Slick Side Upper - Tungsten', 139.99, 5, 0, 4, 'Slick-side receiver finished in tungsten Cerakote.', { finish: 'Tungsten' }),
+  item(301, 3, 'BA-556-16-HANSON', 'BA 16 in. 5.56 Hanson Barrel', 189.99, 6, 1, 2, 'Mid-length Hanson profile barrel with pinned gas block journal.', { caliber: '5.56 NATO', barrel_length: '16 in.' }),
+  item(302, 3, 'BA-223-145-GOV', 'BA 14.5 in. .223 Wylde Barrel', 209.99, 4, 0, 2, 'Government profile .223 Wylde barrel ready for pin and weld.', { caliber: '.223 Wylde', barrel_length: '14.5 in.' }),
+  item(303, 3, 'JJJ-300-9-PSTL', 'JJJ 9 in. 300 BLK Pistol Barrel', 174.99, 1, 1, 4, 'Compact 300 Blackout barrel tuned for suppressor-friendly builds.', { caliber: '300 BLK', barrel_length: '9 in.', compatible_tags: ['ar15', '300blk'] }),
+  item(401, 4, 'JJJ-ML15-FDE', 'JJJ 15 in. M-LOK Handguard - FDE', 154.99, 7, 0, 4, 'Slim free-float M-LOK rail with steel barrel nut.', { finish: 'FDE' }),
+  item(402, 4, 'JJJ-ML13-BLK', 'JJJ 13.5 in. M-LOK Handguard - Black', 144.99, 9, 3, 4, 'Lightweight handguard with anti-rotation tabs.', { finish: 'Black' }),
+  item(403, 4, 'MI-QUAD-125', 'Midwest Combat Quad Rail 12.5 in.', 199.99, 3, 0, 1, 'Duty-grade quad rail for lights, grips, and laser accessories.', { finish: 'Black' }),
+  item(501, 5, 'JJJ-BCG-NITRIDE', 'JJJ M16 Nitride BCG', 119.99, 16, 4, 4, 'MPI bolt, staked gas key, full-auto profile carrier.', { finish: 'Nitride' }),
+  item(502, 5, 'JJJ-BCG-NIB', 'JJJ Nickel Boron BCG', 169.99, 4, 0, 4, 'Easy-clean nickel boron carrier group for premium builds.', { finish: 'Nickel Boron' }),
+  item(601, 6, 'RDN-RAPTOR-LT', 'Radian Raptor-LT Charging Handle', 84.99, 5, 1, 1, 'Ambidextrous polymer-overmold charging handle.', { finish: 'Black' }),
+  item(602, 6, 'JJJ-CH-MILSPEC', 'JJJ Mil-Spec Charging Handle', 24.99, 24, 3, 4, 'Standard charging handle for budget-conscious builds.', { finish: 'Black' }),
+  item(701, 7, 'MAG-MOE-SL-BLK', 'Magpul MOE SL Stock - Black', 64.99, 12, 0, 3, 'Compact carbine stock with improved cheek weld.', { finish: 'Black' }),
+  item(702, 7, 'SBA3-FDE', 'SBA3 Adjustable Brace - FDE', 124.99, 3, 2, 3, 'Five-position adjustable brace for pistol configurations.', { finish: 'FDE' }),
+  item(801, 8, 'ALG-ACT', 'ALG ACT Trigger', 79.99, 8, 0, 1, 'Crisp mil-spec geometry trigger with polished engagement surfaces.'),
+  item(802, 8, 'GSSA-E', 'Geissele SSA-E Trigger', 244.99, 2, 0, 1, 'Two-stage precision trigger for premium rifle builds.'),
+  item(901, 9, 'A2-FH-556', 'A2 Flash Hider 1/2x28', 12.99, 34, 4, 4, 'Classic A2 birdcage flash hider for 5.56 barrels.'),
+  item(902, 9, 'JJJ-COMP-556', 'JJJ Linear Comp 5.56', 49.99, 6, 0, 4, 'Forward-blast linear compensator for short configurations.'),
+  item(1001, 10, 'MBUS3-BLK', 'Magpul MBUS 3 Sight Set', 89.99, 10, 1, 3, 'Low-profile polymer backup sight set.', { finish: 'Black' }),
+  item(1002, 10, 'SIG-ROMEO5', 'SIG Romeo5 Red Dot', 149.99, 4, 0, 1, 'Compact 2 MOA red dot with motion activation.'),
+]
