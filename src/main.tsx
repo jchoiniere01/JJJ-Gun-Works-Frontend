@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import App from './App'
+import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
 import { appTheme } from './theme/theme'
 import './index.css'
@@ -12,9 +13,11 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
       <HashRouter>
-        <CartProvider>
-          <App />
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <App />
+          </CartProvider>
+        </AuthProvider>
       </HashRouter>
     </ThemeProvider>
   </StrictMode>,

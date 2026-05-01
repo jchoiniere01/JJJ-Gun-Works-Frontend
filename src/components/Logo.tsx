@@ -20,7 +20,7 @@ export const Logo = () => (
       <Typography
         variant="h4"
         component="div"
-        sx={{ fontFamily: 'var(--display)', letterSpacing: '-0.04em', lineHeight: 1 }}
+        sx={{ fontFamily: 'var(--display)', letterSpacing: '-0.015em', wordSpacing: '0.08em', lineHeight: 1 }}
       >
         JJJ Gun Works
       </Typography>

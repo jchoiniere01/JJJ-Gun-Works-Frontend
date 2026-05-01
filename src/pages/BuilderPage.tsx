@@ -14,6 +14,7 @@ import {
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import TuneIcon from '@mui/icons-material/Tune'
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
 import { categoryApi, inventoryApi, supplierApi } from '../api/client'
 import { BuildSummary } from '../components/BuildSummary'
 import { ConfiguratorVisual } from '../components/ConfiguratorVisual'
@@ -21,10 +22,54 @@ import { LoadingState } from '../components/LoadingState'
 import { PartCard } from '../components/PartCard'
 import { StatusBanner } from '../components/StatusBanner'
 import { useCart } from '../context/CartContext'
-import type { BuildSelection, InventoryItem, PartCategory, Supplier } from '../types/domain'
+import type { BuildPackage, BuildSelection, InventoryItem, PartCategory, Supplier, WeaponPlatform } from '../types/domain'
 
 const sortCategories = (categories: PartCategory[]) =>
   [...categories].sort((a, b) => (a.sort_order ?? a.id) - (b.sort_order ?? b.id))
+
+const weaponPlatforms: WeaponPlatform[] = ['AR-9', 'AR-10', 'AR-15']
+
+const coreCategorySlugs = [
+  'lower-receiver',
+  'upper-receiver',
+  'barrel',
+  'handguard',
+  'bolt-carrier-group',
+  'charging-handle',
+  'stock-brace',
+  'trigger',
+]
+
+const accessoryCategorySlugs = ['muzzle-device', 'optics-sights', 'laser', 'weapon-light', 'foregrip']
+
+const strictPlatformCategorySlugs = ['lower-receiver', 'upper-receiver', 'barrel', 'bolt-carrier-group', 'muzzle-device']
+
+const requiredCoreSlugs = new Set(coreCategorySlugs)
+
+const platformTag = (platform: WeaponPlatform) => platform.toLowerCase().replace('-', '')
+
+const itemMatchesPlatform = (item: InventoryItem, platform: WeaponPlatform, categorySlug?: string) => {
+  const tags = (item.compatible_tags ?? []).map((tag) => tag.toLowerCase())
+  const itemPlatform = (item.platform ?? '').toLowerCase()
+  const tag = platformTag(platform)
+  const exactPlatform = itemPlatform === platform.toLowerCase() || tags.includes(tag)
+  const universal = itemPlatform === 'universal' || tags.includes('universal') || tags.includes('multi-cal')
+
+  if (strictPlatformCategorySlugs.includes(categorySlug ?? '')) {
+    return exactPlatform
+  }
+
+  if (platform === 'AR-9') {
+    return exactPlatform || universal || itemPlatform === 'ar-15' || tags.includes('ar15')
+  }
+
+  return exactPlatform || universal
+}
+
+const markCategoryRequirement = (category: PartCategory, packageType: BuildPackage): PartCategory => ({
+  ...category,
+  required: packageType === 'weapon' || coreCategorySlugs.includes(category.slug) ? requiredCoreSlugs.has(category.slug) : false,
+})
 
 export const BuilderPage = () => {
   const [categories, setCategories] = useState<PartCategory[]>([])
@@ -34,6 +79,8 @@ export const BuilderPage = () => {
   const [selection, setSelection] = useState<BuildSelection>({})
   const [search, setSearch] = useState('')
   const [finish, setFinish] = useState('all')
+  const [selectedPlatform, setSelectedPlatform] = useState<WeaponPlatform | ''>('')
+  const [buildPackage, setBuildPackage] = useState<BuildPackage | ''>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { addItem } = useCart()
@@ -47,7 +94,7 @@ export const BuilderPage = () => {
         setCategories(sorted)
         setInventory(inventoryData)
         setSuppliers(supplierData)
-        setActiveSlug(sorted[0]?.slug ?? 'lower-receiver')
+        setActiveSlug('lower-receiver')
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unable to load configurator data.')
@@ -58,18 +105,45 @@ export const BuilderPage = () => {
     }
   }, [])
 
-  const activeCategory = categories.find((category) => category.slug === activeSlug)
+  const visibleCategories = useMemo(() => {
+    if (!selectedPlatform || !buildPackage) return []
+    const allowed = buildPackage === 'weapon' ? coreCategorySlugs : [...coreCategorySlugs, ...accessoryCategorySlugs]
+    return categories
+      .filter((category) => allowed.includes(category.slug))
+      .map((category) => markCategoryRequirement(category, buildPackage))
+  }, [buildPackage, categories, selectedPlatform])
+
+  useEffect(() => {
+    if (!visibleCategories.length) return
+    if (!visibleCategories.some((category) => category.slug === activeSlug)) {
+      setActiveSlug(visibleCategories[0].slug)
+    }
+  }, [activeSlug, visibleCategories])
+
+  useEffect(() => {
+    setSelection({})
+    setSearch('')
+    setFinish('all')
+    setActiveSlug('lower-receiver')
+  }, [selectedPlatform, buildPackage])
+
+  const activeCategory = visibleCategories.find((category) => category.slug === activeSlug)
 
   const finishes = useMemo(() => {
-    const values = inventory.map((item) => item.finish).filter(Boolean) as string[]
+    const values = inventory
+      .filter((item) => !activeCategory || item.category_id === activeCategory.id)
+      .filter((item) => !selectedPlatform || itemMatchesPlatform(item, selectedPlatform, activeCategory?.slug))
+      .map((item) => item.finish)
+      .filter(Boolean) as string[]
     return ['all', ...Array.from(new Set(values))]
-  }, [inventory])
+  }, [activeCategory, inventory, selectedPlatform])
 
   const filteredParts = useMemo(() => {
-    if (!activeCategory) return []
+    if (!activeCategory || !selectedPlatform || !buildPackage) return []
     const term = search.trim().toLowerCase()
     return inventory
       .filter((item) => item.category_id === activeCategory.id)
+      .filter((item) => itemMatchesPlatform(item, selectedPlatform, activeCategory.slug))
       .filter((item) => finish === 'all' || item.finish === finish)
       .filter((item) => {
         if (!term) return true
@@ -77,13 +151,18 @@ export const BuilderPage = () => {
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(term))
       })
-  }, [activeCategory, finish, inventory, search])
+  }, [activeCategory, buildPackage, finish, inventory, search, selectedPlatform])
 
   const selectItem = (item: InventoryItem) => {
     const category = categories.find((candidate) => candidate.id === item.category_id)
     if (!category) return
     setSelection((current) => ({ ...current, [category.slug]: item }))
   }
+
+  const setupComplete = Boolean(selectedPlatform && buildPackage)
+  const selectedSuppressor = Object.values(selection).some((item) =>
+    item?.compatible_tags?.some((tag) => ['suppressor', 'nfa'].includes(tag.toLowerCase())),
+  )
 
   const addBuild = () => {
     Object.values(selection).forEach((item) => {
@@ -139,17 +218,89 @@ export const BuilderPage = () => {
                   </Stack>
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
-                  <ConfiguratorVisual selection={selection} />
+                  <ConfiguratorVisual selection={selection} platform={selectedPlatform || undefined} />
                 </Grid>
               </Grid>
             </CardContent>
           </Card>
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <BuildSummary categories={categories} selection={selection} onAddBuild={addBuild} />
+          <BuildSummary
+            categories={visibleCategories}
+            selection={selection}
+            onAddBuild={addBuild}
+            selectedPlatform={selectedPlatform || undefined}
+            buildPackage={buildPackage || undefined}
+          />
         </Grid>
       </Grid>
 
+      <Card>
+        <CardContent>
+          <Stack spacing={2.5}>
+            <Box>
+              <Typography variant="h2">Start the build</Typography>
+              <Typography color="text.secondary">
+                Choose the platform first, then choose whether the customer wants the base weapon or a fully customized package.
+              </Typography>
+            </Box>
+            <Grid container spacing={2.5}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="h4" sx={{ mb: 1 }}>
+                  1. Weapon type
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                  {weaponPlatforms.map((platform) => (
+                    <Button
+                      key={platform}
+                      variant={selectedPlatform === platform ? 'contained' : 'outlined'}
+                      onClick={() => setSelectedPlatform(platform)}
+                      data-testid={`button-platform-${platform.toLowerCase()}`}
+                    >
+                      {platform}
+                    </Button>
+                  ))}
+                </Stack>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="h4" sx={{ mb: 1 }}>
+                  2. Build package
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                  <Button
+                    variant={buildPackage === 'weapon' ? 'contained' : 'outlined'}
+                    onClick={() => setBuildPackage('weapon')}
+                    disabled={!selectedPlatform}
+                    data-testid="button-package-weapon"
+                  >
+                    Weapon only
+                  </Button>
+                  <Button
+                    variant={buildPackage === 'custom' ? 'contained' : 'outlined'}
+                    onClick={() => setBuildPackage('custom')}
+                    disabled={!selectedPlatform}
+                    data-testid="button-package-custom"
+                  >
+                    Fully customized
+                  </Button>
+                </Stack>
+              </Grid>
+            </Grid>
+            {!setupComplete && (
+              <Alert severity="info" data-testid="status-builder-setup-required">
+                Select a weapon type and package before parts populate in the builder.
+              </Alert>
+            )}
+            {setupComplete && (
+              <Alert severity="success" data-testid="status-builder-setup-complete">
+                Showing {selectedPlatform} parts for a {buildPackage === 'weapon' ? 'weapon-only' : 'fully customized'} build.
+              </Alert>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {setupComplete && (
       <Grid container spacing={3.5}>
         <Grid size={{ xs: 12, md: 3 }}>
           <Card sx={{ position: { md: 'sticky' }, top: { md: 104 } }}>
@@ -159,7 +310,7 @@ export const BuilderPage = () => {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Pick a category, then choose the part that matches the customer build.
                 </Typography>
-                {categories.map((category) => (
+                {visibleCategories.map((category) => (
                   <Button
                     key={category.slug}
                     variant={activeSlug === category.slug ? 'contained' : 'text'}
@@ -217,7 +368,7 @@ export const BuilderPage = () => {
             </Card>
             {filteredParts.length === 0 ? (
               <Alert severity="info" data-testid="status-no-parts">
-                No parts match the current filters. Clear the search or select another finish.
+                No {selectedPlatform} parts match this category and filter. Clear the search, select another finish, or add compatible inventory from the owner inventory page.
               </Alert>
             ) : (
               <Grid container spacing={2.5}>
@@ -227,15 +378,29 @@ export const BuilderPage = () => {
                       item={part}
                       selected={selection[activeSlug]?.id === part.id}
                       onSelect={selectItem}
-                      onAdd={addItem}
+                      onAdd={(item) => {
+                        selectItem(item)
+                        addItem(item)
+                      }}
                     />
                   </Grid>
                 ))}
               </Grid>
             )}
+            {activeCategory?.slug === 'muzzle-device' && (
+              <Alert severity="warning" icon={<WarningAmberOutlinedIcon />} data-testid="status-suppressor-warning">
+                Suppressor selections require additional legal waiting period and approval before transfer. This is not a same-day accessory.
+              </Alert>
+            )}
+            {selectedSuppressor && (
+              <Alert severity="warning" icon={<WarningAmberOutlinedIcon />} data-testid="status-selected-suppressor-warning">
+                A suppressor is selected on this build. Add NFA approval timing and transfer instructions before final checkout.
+              </Alert>
+            )}
           </Stack>
         </Grid>
       </Grid>
+      )}
     </Stack>
   )
 }

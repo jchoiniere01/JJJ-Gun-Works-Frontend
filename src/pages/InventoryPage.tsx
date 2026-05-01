@@ -32,6 +32,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import { categoryApi, inventoryApi, supplierApi } from '../api/client'
 import { LoadingState } from '../components/LoadingState'
 import { StatusBanner } from '../components/StatusBanner'
+import { useAuth } from '../context/AuthContext'
 import type { InventoryItem, PartCategory, Supplier } from '../types/domain'
 import { availableQuantity, formatMoney } from '../utils/money'
 
@@ -49,6 +50,7 @@ const emptyItem: Partial<InventoryItem> = {
   finish: '',
   caliber: '',
   barrel_length: '',
+  image_url: '',
   platform: 'AR-15',
 }
 
@@ -59,10 +61,12 @@ export const InventoryPage = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<InventoryItem>>(emptyItem)
   const [categoryDraft, setCategoryDraft] = useState({ name: '', slug: '', description: '' })
   const [supplierDraft, setSupplierDraft] = useState({ name: '', contact_name: '', email: '', lead_time_days: 0 })
+  const { isAdmin, user } = useAuth()
 
   const refresh = async () => {
     const [items, categoryData, supplierData] = await Promise.all([inventoryApi.list(), categoryApi.list(), supplierApi.list()])
@@ -84,21 +88,36 @@ export const InventoryPage = () => {
   }, [inventory])
 
   const openCreate = () => {
+    if (!isAdmin) return
     setEditing({ ...emptyItem, category_id: categories[0]?.id ?? 1, supplier_id: suppliers[0]?.id ?? 1 })
     setDialogOpen(true)
   }
 
   const openEdit = (item: InventoryItem) => {
+    if (!isAdmin) return
     setEditing(item)
     setDialogOpen(true)
   }
 
   const saveItem = async (event: FormEvent) => {
     event.preventDefault()
+    if (!isAdmin) {
+      setError('Only owner/admin users can save inventory changes.')
+      return
+    }
     setError('')
+    setSuccess('')
     try {
+      const {
+        id: _id,
+        category: _category,
+        supplier: _supplier,
+        status: _status,
+        compatible_tags: _compatibleTags,
+        ...editable
+      } = editing
       const payload: Partial<InventoryItem> = {
-        ...editing,
+        ...editable,
         category_id: Number(editing.category_id),
         supplier_id: Number(editing.supplier_id),
         price: Number(editing.price),
@@ -108,21 +127,42 @@ export const InventoryPage = () => {
         reorder_point: Number(editing.reorder_point),
       }
       if (editing.id) {
-        await inventoryApi.update(editing.id, payload)
+        const updated = await inventoryApi.update(editing.id, payload)
+        setInventory((current) =>
+          current.map((item) =>
+            String(item.id) === String(editing.id)
+              ? {
+                  ...item,
+                  ...updated,
+                  category: categories.find((category) => category.id === Number(updated.category_id || payload.category_id)),
+                  supplier: suppliers.find((supplier) => supplier.id === Number(updated.supplier_id || payload.supplier_id)),
+                }
+              : item,
+          ),
+        )
+        setSuccess(`Updated ${editing.name || 'inventory item'}.`)
       } else {
-        await inventoryApi.create(payload)
+        const created = await inventoryApi.create(payload)
+        setInventory((current) => [created, ...current])
+        setSuccess(`Added ${created.name || 'inventory item'}.`)
       }
       setDialogOpen(false)
-      await refresh()
+      void refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save inventory item.')
     }
   }
 
   const deleteItem = async (id: number) => {
+    if (!isAdmin) {
+      setError('Only owner/admin users can delete inventory items.')
+      return
+    }
     setError('')
+    setSuccess('')
     try {
       await inventoryApi.remove(id)
+      setSuccess('Inventory item deleted.')
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to delete inventory item.')
@@ -131,6 +171,10 @@ export const InventoryPage = () => {
 
   const addCategory = async (event: FormEvent) => {
     event.preventDefault()
+    if (!isAdmin) {
+      setError('Only owner/admin users can add categories.')
+      return
+    }
     const slug = categoryDraft.slug || categoryDraft.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
     await categoryApi.create({ ...categoryDraft, slug, required: false })
     setCategoryDraft({ name: '', slug: '', description: '' })
@@ -139,9 +183,34 @@ export const InventoryPage = () => {
 
   const addSupplier = async (event: FormEvent) => {
     event.preventDefault()
+    if (!isAdmin) {
+      setError('Only owner/admin users can add suppliers.')
+      return
+    }
     await supplierApi.create(supplierDraft)
     setSupplierDraft({ name: '', contact_name: '', email: '', lead_time_days: 0 })
     await refresh()
+  }
+
+  if (!isAdmin) {
+    return (
+      <Stack spacing={3}>
+        <StatusBanner />
+        <Card>
+          <CardContent>
+            <Stack spacing={2}>
+              <Typography variant="h1">Owner inventory</Typography>
+              <Alert severity="warning" data-testid="status-inventory-owner-only">
+                Inventory tracking, item creation, category management, supplier records, and price editing are owner-only tools.
+              </Alert>
+              <Typography color="text.secondary">
+                Sign in with an owner/admin account to manage the inventory that feeds the public builder and receiver sales pages.
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Stack>
+    )
   }
 
   if (loading) {
@@ -167,9 +236,17 @@ export const InventoryPage = () => {
           New item
         </Button>
       </Stack>
+      <Alert severity="success" variant="outlined" data-testid="status-inventory-permissions">
+        {`${user?.name || 'Admin'} is signed in with ${user?.role} permissions. Inventory creation, editing, and deletion controls are enabled.`}
+      </Alert>
       {error && (
         <Alert severity="error" data-testid="status-inventory-error">
           {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" data-testid="status-inventory-success">
+          {success}
         </Alert>
       )}
       <Grid container spacing={2.5}>
@@ -229,9 +306,12 @@ export const InventoryPage = () => {
                           />
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton onClick={() => openEdit(item)} data-testid={`button-edit-item-${item.id}`}>
-                            <EditOutlinedIcon />
-                          </IconButton>
+          <IconButton onClick={() => openEdit(item)} data-testid={`button-edit-item-${item.id}`}>
+            <EditOutlinedIcon />
+          </IconButton>
+                          <Button size="small" onClick={() => openEdit(item)} data-testid={`button-edit-item-text-${item.id}`}>
+                            Edit
+                          </Button>
                           <IconButton color="error" onClick={() => deleteItem(item.id)} data-testid={`button-delete-item-${item.id}`}>
                             <DeleteOutlineIcon />
                           </IconButton>
@@ -380,6 +460,16 @@ export const InventoryPage = () => {
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <TextField fullWidth label="Barrel length" value={editing.barrel_length ?? ''} onChange={(e) => setEditing({ ...editing, barrel_length: e.target.value })} data-testid="input-item-barrel-length" />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Item image URL"
+                  value={editing.image_url ?? ''}
+                  onChange={(e) => setEditing({ ...editing, image_url: e.target.value })}
+                  helperText="Optional. Use a hosted product image URL; selected images appear in the builder preview and receiver sales page."
+                  data-testid="input-item-image-url"
+                />
               </Grid>
             </Grid>
           </DialogContent>

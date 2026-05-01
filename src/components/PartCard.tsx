@@ -61,9 +61,13 @@ export const PartCard = ({ item, selected = false, onSelect, onAdd }: PartCardPr
             {item.description}
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">
+            {item.platform && <Chip size="small" color="primary" variant="outlined" label={item.platform} />}
             {item.caliber && <Chip size="small" label={item.caliber} />}
             {item.barrel_length && <Chip size="small" label={item.barrel_length} />}
             {item.finish && <Chip size="small" label={item.finish} />}
+            {item.compatible_tags?.some((tag) => ['suppressor', 'nfa'].includes(tag.toLowerCase())) && (
+              <Chip size="small" color="warning" label="NFA approval" />
+            )}
           </Stack>
           <Divider sx={{ mt: 'auto' }} />
           <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>

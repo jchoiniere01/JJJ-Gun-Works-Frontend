@@ -12,16 +12,18 @@ import {
 } from '@mui/material'
 import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart'
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined'
-import type { BuildSelection, PartCategory } from '../types/domain'
+import type { BuildPackage, BuildSelection, PartCategory, WeaponPlatform } from '../types/domain'
 import { formatMoney } from '../utils/money'
 
 interface BuildSummaryProps {
   categories: PartCategory[]
   selection: BuildSelection
   onAddBuild: () => void
+  selectedPlatform?: WeaponPlatform
+  buildPackage?: BuildPackage
 }
 
-export const BuildSummary = ({ categories, selection, onAddBuild }: BuildSummaryProps) => {
+export const BuildSummary = ({ categories, selection, onAddBuild, selectedPlatform, buildPackage }: BuildSummaryProps) => {
   const requiredCategories = categories.filter((category) => category.required !== false)
   const selectedRequired = requiredCategories.filter((category) => Boolean(selection[category.slug])).length
   const progress = requiredCategories.length ? Math.round((selectedRequired / requiredCategories.length) * 100) : 0
@@ -46,6 +48,30 @@ export const BuildSummary = ({ categories, selection, onAddBuild }: BuildSummary
             </Stack>
             <LinearProgress variant="determinate" value={progress} sx={{ mt: 1.5, height: 8, borderRadius: 20 }} />
           </Box>
+          <Stack spacing={1}>
+            <Stack direction="row" justifyContent="space-between" spacing={1} data-testid="row-build-platform">
+              <Typography variant="body2" fontWeight={700}>
+                Weapon type
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
+                {selectedPlatform || 'Select first'}
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" spacing={1} data-testid="row-build-package">
+              <Typography variant="body2" fontWeight={700}>
+                Package
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
+                {buildPackage === 'weapon' ? 'Weapon only' : buildPackage === 'custom' ? 'Fully customized' : 'Select second'}
+              </Typography>
+            </Stack>
+          </Stack>
+          <Divider />
+          {!selectedPlatform || !buildPackage ? (
+            <Alert severity="info" variant="outlined" data-testid="status-build-preselects-required">
+              Select weapon type and build package before part categories populate.
+            </Alert>
+          ) : null}
           <Stack spacing={1}>
             {categories.map((category) => {
               const selected = selection[category.slug]
@@ -80,7 +106,11 @@ export const BuildSummary = ({ categories, selection, onAddBuild }: BuildSummary
               {formatMoney(subtotal)}
             </Typography>
           </Stack>
-          {missing.length > 0 ? (
+          {!selectedPlatform || !buildPackage ? (
+            <Alert severity="info" variant="outlined">
+              Builder setup is required before adding a build to cart.
+            </Alert>
+          ) : missing.length > 0 ? (
             <Alert severity="warning" variant="outlined" data-testid="status-missing-required">
               Select {missing.map((category) => category.name).join(', ')} before reserving the complete build.
             </Alert>
@@ -93,7 +123,7 @@ export const BuildSummary = ({ categories, selection, onAddBuild }: BuildSummary
             variant="contained"
             size="large"
             startIcon={<AddShoppingCartIcon />}
-            disabled={missing.length > 0}
+            disabled={!selectedPlatform || !buildPackage || missing.length > 0}
             onClick={onAddBuild}
             data-testid="button-add-build"
           >

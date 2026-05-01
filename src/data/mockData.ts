@@ -11,6 +11,9 @@ export const mockCategories: PartCategory[] = [
   { id: 8, name: 'Trigger', slug: 'trigger', sort_order: 8, required: false, description: 'Mil-spec, enhanced, and match trigger options.' },
   { id: 9, name: 'Muzzle Device', slug: 'muzzle-device', sort_order: 9, required: false, description: 'Flash hiders, comps, and brakes.' },
   { id: 10, name: 'Optics / Sights', slug: 'optics-sights', sort_order: 10, required: false, description: 'Iron sights, red dots, and LPVO-ready mounts.' },
+  { id: 11, name: 'Laser', slug: 'laser', sort_order: 11, required: false, description: 'Visible and IR laser aiming modules.' },
+  { id: 12, name: 'Weapon Light', slug: 'weapon-light', sort_order: 12, required: false, description: 'Rail-mounted light options.' },
+  { id: 13, name: 'Foregrip', slug: 'foregrip', sort_order: 13, required: false, description: 'Angled, vertical, and hand-stop options.' },
 ]
 
 export const mockSuppliers: Supplier[] = [
@@ -72,4 +75,17 @@ export const mockInventory: InventoryItem[] = [
   item(902, 9, 'JJJ-COMP-556', 'JJJ Linear Comp 5.56', 49.99, 6, 0, 4, 'Forward-blast linear compensator for short configurations.'),
   item(1001, 10, 'MBUS3-BLK', 'Magpul MBUS 3 Sight Set', 89.99, 10, 1, 3, 'Low-profile polymer backup sight set.', { finish: 'Black' }),
   item(1002, 10, 'SIG-ROMEO5', 'SIG Romeo5 Red Dot', 149.99, 4, 0, 1, 'Compact 2 MOA red dot with motion activation.'),
+  item(1101, 1, 'JJJ-AR9-LR-BLK', 'JJJ AR-9 Glock Mag Lower - Black', 189.99, 5, 0, 4, 'AR-9 lower receiver cut for Glock-pattern magazines.', { platform: 'AR-9', caliber: '9mm', finish: 'Black', compatible_tags: ['ar9', '9mm', 'glock-mag'] }),
+  item(1102, 2, 'JJJ-AR9-UPR-BLK', 'JJJ AR-9 Slick Side Upper', 129.99, 4, 0, 4, 'PCC upper receiver configured for blowback AR-9 builds.', { platform: 'AR-9', caliber: '9mm', finish: 'Black', compatible_tags: ['ar9', '9mm'] }),
+  item(1103, 3, 'JJJ-AR9-8-BRL', 'JJJ 8.5 in. 9mm PCC Barrel', 139.99, 6, 1, 4, 'Compact 9mm barrel for AR-9 pistol caliber carbine builds.', { platform: 'AR-9', caliber: '9mm', barrel_length: '8.5 in.', compatible_tags: ['ar9', '9mm'] }),
+  item(1104, 5, 'JJJ-AR9-BCG', 'JJJ 9mm Blowback BCG', 149.99, 5, 0, 4, 'Dedicated 9mm blowback bolt carrier group.', { platform: 'AR-9', caliber: '9mm', compatible_tags: ['ar9', '9mm'] }),
+  item(1201, 1, 'JJJ-AR10-LR-BLK', 'JJJ AR-10 Lower Receiver - Black', 229.99, 3, 0, 4, 'Large-frame lower receiver for AR-10 pattern builds.', { platform: 'AR-10', caliber: '.308 Win', finish: 'Black', compatible_tags: ['ar10', '308', '7.62'] }),
+  item(1202, 2, 'JJJ-AR10-UPR-BLK', 'JJJ AR-10 Upper Receiver', 199.99, 3, 0, 4, 'Large-frame upper receiver matched for .308 builds.', { platform: 'AR-10', caliber: '.308 Win', finish: 'Black', compatible_tags: ['ar10', '308', '7.62'] }),
+  item(1203, 3, 'BA-308-18-HVY', 'BA 18 in. .308 Barrel', 279.99, 4, 0, 2, 'Rifle-length .308 barrel for large-frame AR-10 builds.', { platform: 'AR-10', caliber: '.308 Win', barrel_length: '18 in.', compatible_tags: ['ar10', '308', '7.62'] }),
+  item(1204, 5, 'JJJ-AR10-BCG-NIT', 'JJJ .308 Nitride BCG', 219.99, 4, 0, 4, 'Large-frame .308 bolt carrier group.', { platform: 'AR-10', caliber: '.308 Win', compatible_tags: ['ar10', '308', '7.62'] }),
+  item(1301, 9, 'RUGGED-556-SUP', 'Rugged 5.56 Suppressor', 799.99, 2, 0, 1, 'Suppressor option requiring additional approval and waiting period before transfer.', { platform: 'AR-15', caliber: '5.56 NATO', finish: 'Black', compatible_tags: ['ar15', '5.56', 'suppressor', 'nfa'] }),
+  item(1302, 9, 'RUGGED-9-SUP', 'Rugged 9mm Suppressor', 749.99, 2, 0, 1, '9mm suppressor option requiring additional approval and waiting period before transfer.', { platform: 'AR-9', caliber: '9mm', finish: 'Black', compatible_tags: ['ar9', '9mm', 'suppressor', 'nfa'] }),
+  item(1401, 11, 'HOLOSUN-LS117', 'Holosun LS117 Visible Laser', 289.99, 3, 0, 1, 'Compact rail-mounted visible laser module.', { platform: 'Universal', finish: 'Black', compatible_tags: ['universal', 'laser'] }),
+  item(1501, 12, 'SUREFIRE-M640', 'SureFire Scout Light Pro', 329.99, 3, 0, 1, 'Duty-grade weapon light with adjustable mount.', { platform: 'Universal', finish: 'Black', compatible_tags: ['universal', 'light'] }),
+  item(1601, 13, 'BCM-KAG-BLK', 'BCM KAG Angled Foregrip', 22.99, 18, 1, 3, 'Low-profile angled grip for M-LOK handguards.', { platform: 'Universal', finish: 'Black', compatible_tags: ['universal', 'foregrip', 'm-lok'] }),
 ]

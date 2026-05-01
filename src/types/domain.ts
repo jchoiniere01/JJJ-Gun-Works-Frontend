@@ -1,4 +1,6 @@
 export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock' | 'backorder' | 'reserved'
+export type WeaponPlatform = 'AR-9' | 'AR-10' | 'AR-15'
+export type BuildPackage = 'weapon' | 'custom'
 
 export interface PartCategory {
   id: number
@@ -40,6 +42,44 @@ export interface InventoryItem {
   barrel_length?: string
   compatible_tags?: string[]
   status?: StockStatus
+}
+
+export type FulfillmentMethod = 'ship_to_ffl' | 'local_pickup'
+
+export type ServiceRequestType = 'receiver_purchase' | 'ffl_transfer' | 'cleaning_service'
+
+export interface ServiceRequestLine {
+  inventory_item_id?: number
+  name: string
+  quantity: number
+  unit_price?: number
+}
+
+export interface ServiceRequestRequest {
+  request_type: ServiceRequestType
+  customer_name: string
+  customer_email: string
+  customer_phone?: string
+  fulfillment_method?: FulfillmentMethod
+  preferred_pickup_at?: string
+  ffl_name?: string
+  ffl_license?: string
+  ffl_email?: string
+  ffl_phone?: string
+  seller_name?: string
+  tracking_number?: string
+  firearm_description?: string
+  notes?: string
+  lines?: ServiceRequestLine[]
+  estimated_total?: number
+}
+
+export interface ServiceRequestResponse {
+  id: number | string
+  request_number?: string
+  status: 'received' | 'pending' | 'scheduled' | 'completed' | 'cancelled'
+  message?: string
+  created_at?: string
 }
 
 export interface ReservationLine {
@@ -96,4 +136,29 @@ export interface BuildSelection {
 export interface ApiStatus {
   mode: 'live' | 'demo'
   message: string
+}
+
+export type UserRole = 'customer' | 'admin' | 'owner'
+
+export interface UserProfile {
+  id: number | string
+  email: string
+  name: string
+  phone?: string
+  role: UserRole
+  saved_at?: string
+}
+
+export interface AuthRequest {
+  email: string
+  password: string
+  name?: string
+  phone?: string
+}
+
+export interface AuthResponse {
+  user: UserProfile
+  access_token?: string
+  token_type?: string
+  message?: string
 }

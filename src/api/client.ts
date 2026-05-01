@@ -6,13 +6,18 @@ import {
 } from '../data/mockData'
 import type {
   ApiStatus,
+  AuthRequest,
+  AuthResponse,
   InventoryItem,
   OrderRequest,
   OrderResponse,
   PartCategory,
   ReservationRequest,
   ReservationResponse,
+  ServiceRequestRequest,
+  ServiceRequestResponse,
   Supplier,
+  UserProfile,
 } from '../types/domain'
 import { availableQuantity } from '../utils/money'
 
@@ -21,7 +26,7 @@ const baseURL = explicitBase?.trim() || ''
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL,
-  timeout: 6500,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -33,6 +38,11 @@ const endpointCandidates = {
   suppliers: ['/api/suppliers', '/suppliers'],
   reservations: ['/api/reservations', '/reservations'],
   orders: ['/api/orders', '/orders'],
+  authLogin: ['/api/auth/login', '/auth/login', '/api/login', '/login'],
+  authRegister: ['/api/auth/register', '/auth/register', '/api/register', '/register', '/api/users', '/users'],
+  authMe: ['/api/auth/me', '/auth/me', '/api/me', '/me'],
+  profile: ['/api/profile', '/profile', '/api/customers/profile', '/customers/profile'],
+  serviceRequests: ['/api/service-requests', '/service-requests', '/api/customer-requests', '/customer-requests'],
 }
 
 const normalizeList = <T>(payload: unknown, key?: string): T[] => {
@@ -87,6 +97,31 @@ const patchFirst = async <TResponse, TBody>(paths: string[], id: number | string
   throw lastError
 }
 
+const putFirst = async <TResponse, TBody>(paths: string[], id: number | string, body: TBody): Promise<TResponse> => {
+  let lastError: unknown
+  for (const path of paths) {
+    try {
+      const response = await apiClient.put<TResponse>(`${path}/${id}`, body)
+      return response.data
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
+const updateFirst = async <TResponse, TBody>(paths: string[], id: number | string, body: TBody): Promise<TResponse> => {
+  try {
+    return await patchFirst<TResponse, TBody>(paths, id, body)
+  } catch (patchError) {
+    try {
+      return await putFirst<TResponse, TBody>(paths, id, body)
+    } catch {
+      throw patchError
+    }
+  }
+}
+
 const deleteFirst = async (paths: string[], id: number | string): Promise<void> => {
   let lastError: unknown
   for (const path of paths) {
@@ -107,6 +142,16 @@ let demoCategories = [...mockCategories]
 let demoSuppliers = [...mockSuppliers]
 let demoReservations: ReservationResponse[] = []
 let demoOrders: OrderResponse[] = []
+let demoServiceRequests: ServiceRequestResponse[] = []
+let demoUsers: UserProfile[] = [
+  {
+    id: 'demo-admin',
+    email: 'owner@jjjgunworks.com',
+    name: 'JJJ Gun Works Owner',
+    role: 'owner',
+    saved_at: new Date().toISOString(),
+  },
+]
 
 let usingDemo = !explicitBase
 
@@ -144,6 +189,110 @@ export const getApiStatus = (): ApiStatus => ({
     : 'Connected to the FastAPI backend.',
 })
 
+export const setAuthToken = (token?: string | null) => {
+  if (token) {
+    apiClient.defaults.headers.common.Authorization = `Bearer ${token}`
+  } else {
+    delete apiClient.defaults.headers.common.Authorization
+  }
+}
+
+export const authApi = {
+  login: (body: AuthRequest): Promise<AuthResponse> =>
+    withDemoFallback(
+      async () => postFirst<AuthResponse, AuthRequest>(endpointCandidates.authLogin, body),
+      async () => {
+        await demoDelay()
+        const existing = demoUsers.find((user) => user.email.toLowerCase() === body.email.toLowerCase())
+        const isOwnerDemo = body.email.toLowerCase() === 'owner@jjjgunworks.com'
+        const user =
+          existing ||
+          ({
+            id: `demo-user-${Date.now()}`,
+            email: body.email,
+            name: body.name || body.email.split('@')[0],
+            phone: body.phone || '',
+            role: isOwnerDemo ? 'owner' : 'customer',
+            saved_at: new Date().toISOString(),
+          } satisfies UserProfile)
+        if (!existing) demoUsers = [user, ...demoUsers]
+        return {
+          user,
+          access_token: `demo-token-${user.id}`,
+          token_type: 'bearer',
+          message: isOwnerDemo
+            ? 'Demo owner session active. Wire this to your FastAPI auth service for production.'
+            : 'Demo customer session active. Wire this to your FastAPI auth service for production.',
+        }
+      },
+    ),
+  register: (body: AuthRequest): Promise<AuthResponse> =>
+    withDemoFallback(
+      async () => postFirst<AuthResponse, AuthRequest>(endpointCandidates.authRegister, body),
+      async () => {
+        await demoDelay()
+        const existing = demoUsers.find((user) => user.email.toLowerCase() === body.email.toLowerCase())
+        const user: UserProfile =
+          existing ||
+          ({
+            id: `demo-user-${Date.now()}`,
+            email: body.email,
+            name: body.name || body.email.split('@')[0],
+            phone: body.phone || '',
+            role: 'customer',
+            saved_at: new Date().toISOString(),
+          } satisfies UserProfile)
+        demoUsers = [user, ...demoUsers.filter((candidate) => candidate.email !== user.email)]
+        return {
+          user,
+          access_token: `demo-token-${user.id}`,
+          token_type: 'bearer',
+          message: 'Account information saved in demo mode. Connect FastAPI auth to persist it server-side.',
+        }
+      },
+    ),
+  me: (): Promise<UserProfile> =>
+    withDemoFallback(
+      async () => {
+        for (const path of endpointCandidates.authMe) {
+          try {
+            const response = await apiClient.get<UserProfile | AuthResponse>(path)
+            return 'user' in response.data ? response.data.user : response.data
+          } catch {
+            // Try the next conventional auth endpoint.
+          }
+        }
+        throw new Error('Unable to load current user.')
+      },
+      async () => {
+        await demoDelay()
+        return demoUsers[0]
+      },
+    ),
+  updateProfile: (body: Partial<UserProfile>): Promise<UserProfile> =>
+    withDemoFallback(
+      async () => {
+        for (const path of endpointCandidates.profile) {
+          try {
+            const response = await apiClient.patch<UserProfile | AuthResponse>(path, body)
+            return 'user' in response.data ? response.data.user : response.data
+          } catch {
+            // Try the next conventional profile endpoint.
+          }
+        }
+        throw new Error('Unable to update profile.')
+      },
+      async () => {
+        await demoDelay()
+        const email = body.email?.toLowerCase()
+        demoUsers = demoUsers.map((user) =>
+          !email || user.email.toLowerCase() === email ? { ...user, ...body, saved_at: new Date().toISOString() } : user,
+        )
+        return demoUsers.find((user) => !email || user.email.toLowerCase() === email) || demoUsers[0]
+      },
+    ),
+}
+
 export const inventoryApi = {
   list: () =>
     withDemoFallback(
@@ -178,7 +327,7 @@ export const inventoryApi = {
     ),
   update: (id: number | string, body: Partial<InventoryItem>) =>
     withDemoFallback(
-      async () => patchFirst<InventoryItem, Partial<InventoryItem>>(endpointCandidates.inventory, id, body),
+      async () => updateFirst<InventoryItem, Partial<InventoryItem>>(endpointCandidates.inventory, id, body),
       async () => {
         await demoDelay()
         demoInventory = demoInventory.map((item) => (String(item.id) === String(id) ? { ...item, ...body } : item))
@@ -223,7 +372,7 @@ export const categoryApi = {
     ),
   update: (id: number | string, body: Partial<PartCategory>) =>
     withDemoFallback(
-      async () => patchFirst<PartCategory, Partial<PartCategory>>(endpointCandidates.categories, id, body),
+      async () => updateFirst<PartCategory, Partial<PartCategory>>(endpointCandidates.categories, id, body),
       async () => {
         await demoDelay()
         demoCategories = demoCategories.map((category) => (String(category.id) === String(id) ? { ...category, ...body } : category))
@@ -269,7 +418,7 @@ export const supplierApi = {
     ),
   update: (id: number | string, body: Partial<Supplier>) =>
     withDemoFallback(
-      async () => patchFirst<Supplier, Partial<Supplier>>(endpointCandidates.suppliers, id, body),
+      async () => updateFirst<Supplier, Partial<Supplier>>(endpointCandidates.suppliers, id, body),
       async () => {
         await demoDelay()
         demoSuppliers = demoSuppliers.map((supplier) => (String(supplier.id) === String(id) ? { ...supplier, ...body } : supplier))
@@ -355,6 +504,44 @@ export const orderApi = {
       async () => {
         await demoDelay()
         return demoOrders
+      },
+    ),
+}
+
+export const serviceRequestApi = {
+  create: (body: ServiceRequestRequest): Promise<ServiceRequestResponse> =>
+    withDemoFallback(
+      async () => postFirst<ServiceRequestResponse, ServiceRequestRequest>(endpointCandidates.serviceRequests, body),
+      async () => {
+        await demoDelay()
+        const prefix =
+          body.request_type === 'receiver_purchase'
+            ? 'RCV'
+            : body.request_type === 'ffl_transfer'
+              ? 'FFL'
+              : 'CLN'
+        const request: ServiceRequestResponse = {
+          id: `${prefix}-${Date.now()}`,
+          request_number: `${prefix}-${Math.floor(100000 + Math.random() * 899999)}`,
+          status: body.preferred_pickup_at ? 'scheduled' : 'received',
+          created_at: new Date().toISOString(),
+          message:
+            body.request_type === 'receiver_purchase'
+              ? 'Receiver purchase request received. JJJ Gun Works will confirm availability, FFL details, and next steps.'
+              : body.request_type === 'ffl_transfer'
+                ? 'Inbound FFL transfer notice received. JJJ Gun Works will contact you when the firearm arrives.'
+                : 'Cleaning service request received. JJJ Gun Works will confirm drop-off or pickup timing.',
+        }
+        demoServiceRequests = [request, ...demoServiceRequests]
+        return request
+      },
+    ),
+  list: () =>
+    withDemoFallback(
+      async () => getFirst<ServiceRequestResponse>(endpointCandidates.serviceRequests, 'service_requests'),
+      async () => {
+        await demoDelay()
+        return demoServiceRequests
       },
     ),
 }
